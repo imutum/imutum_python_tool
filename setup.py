@@ -55,6 +55,7 @@ setuptools.setup(
     # ext_modules=ext_modules,
     python_requires='>=3.8',
     classifiers=[
+        "Development Status :: 3 - Alpha",
         "Programming Language :: Python :: 3.8",
         "Intended Audience :: Developers",
         "License :: OSI Approved :: Apache Software License",

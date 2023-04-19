@@ -29,7 +29,6 @@ def auto_logger_name(func):
     return wrapper
 
 
-@auto_logger_name
 def getLogger(name="Logger", level=None, isNamePath=True):
     level = logging.INFO if level is None else level
     name = os.path.splitext(os.path.basename(name))[0] if isNamePath else name
@@ -38,7 +37,6 @@ def getLogger(name="Logger", level=None, isNamePath=True):
     return logger
 
 
-@auto_logger_name
 def create_stream_logger(name="Logger", log_level=logging.INFO):
     formatter = logging.Formatter(fmt=fmt_classic, datefmt=datefmt_classic)
     handler = logging.StreamHandler()
@@ -49,7 +47,6 @@ def create_stream_logger(name="Logger", log_level=logging.INFO):
     return logger
 
 
-@auto_logger_name
 def create_file_logger(name, filename, log_level=logging.INFO):
     logger = logging.getLogger(name)
     logger.setLevel(log_level)

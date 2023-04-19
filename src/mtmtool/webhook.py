@@ -14,7 +14,7 @@ def auto_send(message, *args, **kwargs):
     raise ValueError(f"Not Support API Type {args[0]}")
 
 
-def dingding(text, key: str = ""):
+def dingding(text, key: str = "", **kargs):
     url = 'https://oapi.dingtalk.com/robot/send?access_token=' + key
     if ':' not in text and "." not in text and "," not in text and "。" not in text:
         text += "."
@@ -29,7 +29,7 @@ def dingding(text, key: str = ""):
     return html.ok
 
 
-def wechat(text, key: str = ""):
+def wechat(text, key: str = "", **kargs):
     url = 'https://qyapi.weixin.qq.com/cgi-bin/webhook/send?key=' + key
     data = {
         "msgtype": "text",
@@ -49,17 +49,17 @@ def qq(text, key: str = ""):
     return html.ok
 
 
-def mi(text, key: str = "", title="bot"):
+def mi(text, key: str = "", title="bot", **kargs):
     url = "https://tdtt.top/send"
     data = {"title": title, "content": text, "alias": key}
     response = requests.post(url, data=data)
     return response.ok
 
 
-def telegram(text: str, bot: str, chat: str, protect_content=False):
+def telegram(text: str, bot: str, chat: str, protect_content=False, host="api.telegram.org", **kargs):
     bot_token = bot
     chat_id = chat
-    url = f"https://api.telegram.org/bot{bot_token}/sendMessage"
+    url = f"https://{host}/bot{bot_token}/sendMessage"
     data = {
         "chat_id": chat_id,
         "text": text,
@@ -69,7 +69,7 @@ def telegram(text: str, bot: str, chat: str, protect_content=False):
     return res.json()
 
 
-def pushplus(message, token, title="default", template="html"):
+def pushplus(message, token, title="default", template="html", **kargs):
     url = f'http://www.pushplus.plus/send?token={token}&title={title}&content={message}&template={template}'
     resq = requests.get(url=url)
     return resq.text

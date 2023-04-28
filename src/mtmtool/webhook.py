@@ -3,18 +3,19 @@ import json
 
 
 def auto_send(message, *args, **kwargs):
-    if args[0].lower() == "telegram":
-        return telegram(message, *args[1:], **kwargs)
-    if args[0].lower() == "pushplus":
-        return pushplus(message, *args[1:], **kwargs)
-    if args[0].lower() == "wechat":
-        return wechat(message, *args[1:], **kwargs)
-    if args[0].lower() == "qq":
-        return qq(message, *args[1:], **kwargs)
-    raise ValueError(f"Not Support API Type {args[0]}")
+    if kwargs.get("platform", None):
+        platform = kwargs["platform"]
+    elif len(args) > 0:
+        args = list(args)
+        platform = args.pop(0).lower()
+    else:
+        raise ValueError(f"API Platform Not Found.")
+    if platform in globals() and callable(globals()[platform]):
+        return globals()[platform](message, *args[1:], **kwargs)
+    raise ValueError(f"Not Support API Platform {args[0]}")
 
 
-def dingding(text, key: str = "", **kargs):
+def dingding(text, key: str = "", **kwargs):
     url = 'https://oapi.dingtalk.com/robot/send?access_token=' + key
     if ':' not in text and "." not in text and "," not in text and "。" not in text:
         text += "."
@@ -29,7 +30,7 @@ def dingding(text, key: str = "", **kargs):
     return html.ok
 
 
-def wechat(text, key: str = "", **kargs):
+def wechat(text, key: str = "", **kwargs):
     url = 'https://qyapi.weixin.qq.com/cgi-bin/webhook/send?key=' + key
     data = {
         "msgtype": "text",
@@ -49,27 +50,29 @@ def qq(text, key: str = ""):
     return html.ok
 
 
-def mi(text, key: str = "", title="bot", **kargs):
+def mi(text, key: str = "", title="bot", **kwargs):
     url = "https://tdtt.top/send"
     data = {"title": title, "content": text, "alias": key}
     response = requests.post(url, data=data)
     return response.ok
 
 
-def telegram(text: str, bot: str, chat: str, protect_content=False, host="api.telegram.org", **kargs):
-    bot_token = bot
-    chat_id = chat
-    url = f"https://{host}/bot{bot_token}/sendMessage"
+def telegram(text: str, token: str, chat: str, host="api.telegram.org", mono=False, **kwargs):
+    url = f"https://{host}/bot{token}/sendMessage"
+    # 设置字体为等宽字体
+    if mono and "parse_mode" not in kwargs:
+        text = f"<pre>{text}</pre>"
+        kwargs["parse_mode"] = "HTML"
+
     data = {
-        "chat_id": chat_id,
+        "chat_id": chat,
         "text": text,
-        "protect_content": protect_content,
+        **kwargs,
     }
-    res = requests.get(url, data=data)
-    return res.json()
+    return requests.get(url, data=data).json()
 
 
-def pushplus(message, token, title="default", template="html", **kargs):
+def pushplus(message, token, title="default", template="html", **kwargs):
     url = f'http://www.pushplus.plus/send?token={token}&title={title}&content={message}&template={template}'
     resq = requests.get(url=url)
     return resq.text

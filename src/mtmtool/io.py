@@ -1,4 +1,3 @@
-from ast import literal_eval
 import pickle
 import json
 import yaml
@@ -46,7 +45,7 @@ def write_txt(path, data, encoding="utf8"):
 def read_json(path):
     with open(path, "r", encoding="utf8") as f:
         data = f.read()
-    res = literal_eval(data)
+    res = json.loads(data)
     return res
 
 

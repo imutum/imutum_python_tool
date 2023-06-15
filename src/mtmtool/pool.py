@@ -76,7 +76,7 @@ class MapPool:
 
     def result(self):
         logger.info("Start running with {} workers, {} tasks".format(self.max_workers, len(self.buffer)))
-        with ProcessPoolExecutor(max_workers=self.max_workers) as executor:
+        with self.pool(max_workers=self.max_workers) as executor:
             res = executor.map(self.worker_wrapper, self.buffer)
         self.buffer = []
         return res

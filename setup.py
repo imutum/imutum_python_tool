@@ -3,7 +3,7 @@ import os, shutil, sys, glob
 package_name = "imutum_python_tool"
 abbreviation_name = "mtmtool"
 description = " A Personal Python Tool Library."
-version = "1.2.4"
+version = "1.2.5"
 
 
 def check_requires(requires: list):

@@ -12,8 +12,8 @@ level_dict = {
 }
 
 # 默认的日志格式
-datefmt_classic = "%Y-%m-%d %H:%M:%S"
-fmt_classic = '%(asctime)s.%(msecs)03d UTC %(levelname)s %(name)s: %(message)s'
+datefmt_classic = "%Y-%m-%d %H:%M:%S %z"
+fmt_classic = '%(asctime)s %(levelname)s %(name)s: %(message)s'
 
 
 # 装饰器，自动获取函数的name参数，如果是文件路径，则自动提取文件名作为logger的name

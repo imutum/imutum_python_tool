@@ -3,7 +3,7 @@ import os, shutil, sys, glob
 package_name = "imutum_python_tool"
 abbreviation_name = "mtmtool"
 description = " A Personal Python Tool Library."
-version = "1.2.7"
+version = "1.2.8"
 
 
 def check_requires(requires: list):
@@ -51,7 +51,7 @@ setuptools.setup(
     package_dir={"": "src"},
     zip_safe=False,
     include_package_data=True,  #启用清单文件MANIFEST.in,包含数据文件
-    install_requires=["requests", "pyyaml"],
+    install_requires=["requests", "pyyaml", "dill"],
     # ext_modules=ext_modules,
     python_requires='>=3.8',
     classifiers=[

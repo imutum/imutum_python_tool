@@ -5,7 +5,7 @@ from multiprocessing import Pool
 from multiprocessing.pool import ThreadPool
 from concurrent.futures import ProcessPoolExecutor, ThreadPoolExecutor
 import os, sys
-from collections.abc import Callable
+from collections.abc import Callable, Generator
 import dill
 
 logger = create_stream_logger("Pool")
@@ -74,12 +74,12 @@ class MapPool:
         workers = kwargs.get("workers", self.max_workers)
         if "workers" in kwargs:
             kwargs.pop("workers")        
-        if workers == 1:
-            # 如果只有一个worker, 则直接运行
+        if workers is None:
+            # 如果没有传入worker数量, 则像普通函数一样运行
             func = dill.loads(self.function_dill)
             return func(*args, **kwargs)
         else:
-            # 如果有多个worker, 则将任务放入缓冲区
+            # 如果指定了worker数量, 则将任务放入缓冲区
             self.buffer.append((args, kwargs))
 
     def worker_wrapper(self, arg:tuple, func:Callable=None):
@@ -94,7 +94,7 @@ class MapPool:
             return func(*args, **kwargs)
 
     
-    def result(self, max_workers:int=None, pool_type:str=None):
+    def result(self, max_workers:int=None, pool_type:str=None)->Generator:
         # 如果没有传入参数, 则使用构造时的参数
         if max_workers is None:
             max_workers = self.max_workers
@@ -102,7 +102,7 @@ class MapPool:
             pool_type = self.pool_type
         # 如果缓冲区为空, 则直接返回
         if max_workers == 1 or max_workers is None:
-            # 如果只有一个worker, 则直接运行
+            # 如果只有一个worker, 或者没有传入worker数量, 则直接运行，不使用线程池或进程池
             _func = dill.loads(self.function_dill)
             result = [_func(*args, **kwargs) for args, kwargs in self.buffer]
         else:

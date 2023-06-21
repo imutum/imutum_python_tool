@@ -245,6 +245,7 @@ for i in range(10):
 print(add_.result(pool_type="Process")) # Process，使用进程池    
 ```
 ***
+上面的代码在Github上的个人工具库内，可以通过pip安装```pip install mtmtool==1.2.9```，导入代码为```from mtmtool.pool import MapPool, pooling```。由于是个人库，不会考虑前后兼容问题，小伙伴们注意下版本号，与此篇一样的代码最新版本号为1.2.9。  
 在完全理解了上一篇原理和这一篇的示例以后，希望大家都可以自定义装饰器完成复杂功能
 
 

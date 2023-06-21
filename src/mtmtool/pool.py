@@ -59,10 +59,10 @@ def starmap(func, *args, is_test=False, worker_num=None, ptype="Process"):
 
 
 class MapPool:
-    def __init__(self, func:Callable=None, max_workers:int=None, ptype:str="Thread", **kwargs) -> None:
+    def __init__(self, func:Callable=None, max_workers:int=None, pool_type:str="Thread", **kwargs) -> None:
         self.max_workers = max_workers # 最大worker数量
         self.buffer = [] # 任务缓冲区
-        self.pool_type = ptype # 进程池类型
+        self.pool_type = pool_type # 进程池类型
         # 将函数序列化，以便在子进程中使用
         self.function_dill = dill.dumps(func)
         # 复制函数属性
@@ -94,21 +94,21 @@ class MapPool:
             return func(*args, **kwargs)
 
     
-    def result(self, max_workers:int=None, pool_type:str=None)->Generator:
+    def result(self, workers:int=None, pool_type:str=None)->Generator:
         # 如果没有传入参数, 则使用构造时的参数
-        if max_workers is None:
-            max_workers = self.max_workers
+        if workers is None:
+            workers = self.max_workers
         if pool_type is None:
             pool_type = self.pool_type
         # 如果缓冲区为空, 则直接返回
-        if max_workers == 1 or max_workers is None:
+        if workers == 1 or workers is None:
             # 如果只有一个worker, 或者没有传入worker数量, 则直接运行，不使用线程池或进程池
             _func = dill.loads(self.function_dill)
             result = [_func(*args, **kwargs) for args, kwargs in self.buffer]
         else:
-            logger.info("Running ({} workers, {} tasks)".format(max_workers, len(self.buffer)))
+            logger.info("Running ({} workers, {} tasks)".format(workers, len(self.buffer)))
             # 如果有多个worker, 则运行缓冲区中的任务
-            if pool_type is not None and self.pool_type.lower() == "process":
+            if pool_type is not None and pool_type.lower() == "process":
                 # 如果是进程池, 则需要将函数序列化，否则会报错
                 worker_wrapper = partial(self.worker_wrapper, func=None)
                 pool_executor = ProcessPoolExecutor
@@ -117,7 +117,7 @@ class MapPool:
                 worker_wrapper = partial(self.worker_wrapper, func=dill.loads(self.function_dill))
                 pool_executor = ThreadPoolExecutor
             # 使用线程池或进程池运行任务
-            with pool_executor(max_workers=max_workers) as executor:
+            with pool_executor(max_workers=workers) as executor:
                 result = executor.map(worker_wrapper, self.buffer)
         # 清空缓冲区
         self.buffer = []
@@ -127,17 +127,17 @@ class MapPool:
         # 返回结果
         return result
 
-def map_pool(func:Callable=None, max_workers:int=None, pool_type:str=None):
+def pooling(func:Callable=None, max_workers:int=None, pool_type:str=None):
     """这是一个装饰器，用于将函数转换为MapPool对象
 
     Parameters
     ----------
     func : Callable, optional
-        输入函数,使用形式为@map_pool, 不能传入参数, by default None
+        输入函数,使用形式为@pooling, 不能传入参数, by default None
     max_workers : int, optional
-        默认最大工作数目,使用形式为@map_pool(), by default None
+        默认最大工作数目,使用形式为@pooling(), by default None
     pool_type : str, optional
-        默认类型,使用形式为@map_pool(), by default None
+        默认类型,使用形式为@pooling(), by default None
 
     Returns
     -------

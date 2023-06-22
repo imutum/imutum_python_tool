@@ -49,7 +49,7 @@ def auto_parse_time_with_datefmt(timestr, datefmt):
                     .replace("%j", "([0-2][0-9]{2}|3[0-5][0-9]|36[0-6])")\
                     .replace("%m", "(0[1-9]|1[0-2])")\
                     .replace("%d", "(0[1-9]|[1-2][0-9]|3[0-1])")\
-                    .replace("%H", "(0[1-9]|1[0-9]|2[0-4])")\
+                    .replace("%H", "(0[0-9]|1[0-9]|2[0-3])")\
                     .replace("%M", "([0-5][0-9])")\
                     .replace("%S", "([0-5][0-9])")
     pattern = f"{pattern}"

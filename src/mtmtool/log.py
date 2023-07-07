@@ -38,25 +38,30 @@ def getLogger(name="Logger", level=None, isNamePath=True):
 
 
 def create_stream_logger(name="Logger", log_level=logging.INFO):
+    logger = logging.getLogger(name)
+    if len(logger.handlers) >= 1:
+        logger.handlers.clear()
     formatter = logging.Formatter(fmt=fmt_classic, datefmt=datefmt_classic)
     handler = logging.StreamHandler()
     handler.setFormatter(formatter)
-    logger = logging.getLogger(name)
     logger.setLevel(log_level)
     logger.addHandler(handler)
     return logger
 
 
-def create_file_logger(name, filename, log_level=logging.INFO):
+def create_file_logger(name, filename, log_level=logging.INFO, with_stream=True):
     logger = logging.getLogger(name)
+    if len(logger.handlers) >= 1:
+        logger.handlers.clear()
     logger.setLevel(log_level)
     formatter = logging.Formatter(fmt=fmt_classic, datefmt=datefmt_classic)
     handler = logging.FileHandler(filename, mode='a', encoding=None, delay=False)
     handler.setFormatter(formatter)
-    logger.addHandler(handler)
-    handler = logging.StreamHandler()
-    handler.setFormatter(formatter)
-    logger.addHandler(handler)
+    if with_stream:
+        logger.addHandler(handler)
+        handler = logging.StreamHandler()
+        handler.setFormatter(formatter)
+        logger.addHandler(handler)
     return logger
 
 

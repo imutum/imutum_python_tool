@@ -1,12 +1,14 @@
 from functools import partial, update_wrapper
 from itertools import product
 from mtmtool.log import create_stream_logger
+from mtmtool.decorator import return_func
 from multiprocessing import Pool
 from multiprocessing.pool import ThreadPool
 from concurrent.futures import ProcessPoolExecutor, ThreadPoolExecutor
 import os, sys
 from collections.abc import Callable, Generator
 import dill
+
 
 logger = create_stream_logger("Pool")
 
@@ -56,6 +58,10 @@ def starmap(func, *args, is_test=False, worker_num=None, ptype="Process"):
         with pool(worker_num) as p:
             res = p.starmap(func, iters)
     return res
+
+
+def is_mp_main():
+    return sys.modules["__mp_main__"].__name__ == "__mp_main__"
 
 
 class MapPool:
@@ -127,7 +133,10 @@ class MapPool:
         # 返回结果
         return result
 
-def pooling(func:Callable=None, max_workers:int=None, pool_type:str=None):
+
+
+
+def pooling(func:Callable=None, max_workers:int=None, pool_type:str=None, **kwargs):
     """这是一个装饰器，用于将函数转换为MapPool对象
 
     Parameters
@@ -149,5 +158,3 @@ def pooling(func:Callable=None, max_workers:int=None, pool_type:str=None):
     
     def _MapPoolDecorator(_func):
         return MapPool(_func, max_workers, pool_type)
-    
-    return _MapPoolDecorator

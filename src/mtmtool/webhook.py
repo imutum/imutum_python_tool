@@ -11,8 +11,8 @@ def auto_send(message, *args, **kwargs):
     else:
         raise ValueError(f"API Platform Not Found.")
     if platform in globals() and callable(globals()[platform]):
-        return globals()[platform](message, *args[1:], **kwargs)
-    raise ValueError(f"Not Support API Platform {args[0]}")
+        return globals()[platform](message, *args, **kwargs)
+    raise ValueError(f"Not Support API Platform {platform}")
 
 
 def dingding(text, key: str = "", **kwargs):

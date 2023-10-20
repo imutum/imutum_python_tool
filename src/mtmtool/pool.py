@@ -1,7 +1,6 @@
 from functools import partial, update_wrapper
 from itertools import product
-from mtmtool.log import create_stream_logger
-from mtmtool.decorator import return_func
+from mtmtool.log import stream_logger
 from multiprocessing import Pool
 from multiprocessing.pool import ThreadPool
 from concurrent.futures import ProcessPoolExecutor, ThreadPoolExecutor
@@ -10,14 +9,9 @@ from collections.abc import Callable, Generator
 import dill
 
 
-logger = create_stream_logger("Pool")
+logger = stream_logger("MtmPool")
 
 CPUNUM = os.cpu_count()
-
-
-def parfunc(func, *args, **kargs):
-    return partial(func, *args, **kargs)
-
 
 """ 
 map 与 starmap 函数的区别:
@@ -100,7 +94,7 @@ class MapPool:
             return func(*args, **kwargs)
 
     
-    def result(self, workers:int=None, pool_type:str=None)->Generator:
+    def result(self, workers:int=None, pool_type:str=None, **kwargs)->Generator:
         # 如果没有传入参数, 则使用构造时的参数
         if workers is None:
             workers = self.max_workers
@@ -132,8 +126,6 @@ class MapPool:
             del self._func
         # 返回结果
         return result
-
-
 
 
 def pooling(func:Callable=None, max_workers:int=None, pool_type:str=None, **kwargs):

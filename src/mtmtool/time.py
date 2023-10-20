@@ -1,48 +1,50 @@
-import time
 import datetime, calendar
 import re
 
-class sTime:
-    def __init__(self, srctime=None):
-        self.datetime = srctime
+class MTime:
+    @staticmethod
+    def from_str(timestr:str, format="%Y-%m-%d %H:%M:%S", utc=False):
+        dt = datetime.datetime.strptime(timestr, format)
+        if utc:
+            dt = dt.replace(tzinfo=datetime.timezone.utc)
+        return dt
+    
+    @staticmethod
+    def from_timestamp(timestamp:float, ms=True, utc=False):
+        if utc:
+            return datetime.datetime.utcfromtimestamp(timestamp / (1000 if ms else 1))
+        else:
+            return datetime.datetime.fromtimestamp(timestamp / (1000 if ms else 1))
+    
+    @staticmethod
+    def to_timestamp(dt:datetime.datetime, ms=True):
+        return dt.timestamp() * (1000 if ms else 1)
+                   
+    @staticmethod
+    def to_str(dt:datetime.datetime, format="%Y-%m-%d %H:%M:%S"):
+        return dt.strftime(format)
 
-    def __call__(self, srctime):
-        self.datetime = srctime
-        return self
+    @staticmethod
+    def months_ago(dt:datetime.datetime, months=1, day_of_month=1):
+        for _ in range(months):
+            dt = dt.replace(day=1) - datetime.timedelta(days=1)
+        return dt.replace(day=day_of_month)
 
-    def fromstr(self, timestr, format="%Y-%m-%d"):
-        self.datetime = datetime.datetime.strptime(timestr, format)
-        return self
+    @staticmethod
+    def months_later(dt:datetime.datetime, months=1, day_of_month=1):
+        for _ in range(months):
+            _, days_of_month = calendar.monthrange(dt.year, dt.month)
+            dt = dt.replace(day=days_of_month) + datetime.timedelta(days=1)
+        return dt.replace(day=day_of_month)
 
-    def tostr(self, format="%Y-%m-%d"):
-        return self.datetime.strftime(format)
+    @staticmethod
+    def days_ago(dt:datetime.datetime, days=1):
+        return dt + datetime.timedelta(days=days)
 
-    def last_month(self, objday=1):
-        self.datetime = (self.datetime.replace(day=1) - datetime.timedelta(days=1)).replace(day=objday)
-        return self
+    @staticmethod
+    def days_later(dt:datetime.datetime, days=1):
+        return dt - datetime.timedelta(days=days)
 
-    def next_month(self, objday=1):
-        week, days_num = calendar.monthrange(self.datetime.year, self.datetime.month)
-        self.datetime = (self.datetime.replace(day=days_num) + datetime.timedelta(days=1)).replace(day=objday)
-        return self
-
-    def next_day(self):
-        self.datetime = self.datetime + datetime.timedelta(days=1)
-        return self
-
-    def last_day(self):
-        self.datetime = self.datetime - datetime.timedelta(days=1)
-        return self
-
-
-def timestamp2timestr(timeStamp, format="%Y-%m-%d %H:%M:%S", isMicroSecond=True, isUtc=False):
-    time_function = time.gmtime if isUtc else time.localtime
-    return time.strftime(format, time_function(timeStamp / (1000 if isMicroSecond else 1)))
-
-
-def timestr2timestamp(timestr, format="%Y-%m-%d %H:%M:%S", isMicroSecond=True):
-    timeArray = time.strptime(timestr, format)
-    return int(time.mktime(timeArray)) * (1000 if isMicroSecond else 1)
 
 def auto_parse_time_with_datefmt(timestr, datefmt):
     pattern = datefmt.replace("%Y", "(\d{4})")\
@@ -61,9 +63,51 @@ def auto_parse_time_with_datefmt(timestr, datefmt):
     datestr_new = ["".join(i) for i in match] if match else []
     return [datetime.datetime.strptime(i, datefmt_new) for i in datestr_new]
 
-st = sTime()
 
-if __name__ == '__main__':
-    timestr = r"MCD19A2.A2019267.h28v05.006.2019269040927.hdf"
-    datefmt = "%Y%j"
-    print(auto_parse_time_with_datefmt(timestr, datefmt))
+def datetimes_split_to_columns(dataframe, column:str="datetime", index:bool=False, times_first:bool=True):
+    """将时间列拆分为(年, 月, 月中日, 年中日, 时, 分, 秒)等列
+
+    Parameters
+    ----------
+    dataframe : pandas.DataFrame
+        待处理的DataFrame
+    column : str, optional
+        列名称, 当index参数为False时, 使用列名获取时间列表, by default "datetime"
+    index : bool, optional
+        时间列是否是DataFrame的索引, by default True
+    times_first : bool, optional
+        是否要把拆分的时间列放在所有列的最前面, by default True
+
+    Returns
+    -------
+    pandas.DataFrame
+        处理后的DataFrame
+    """
+    import pandas as pd
+    # 检查输入是否是DataFrame
+    if not isinstance(dataframe, pd.DataFrame):
+        raise TypeError("Input dataframe is not a pandas.DataFrame object")
+    # 复制DataFrame
+    df = dataframe.copy()
+    # 保存原始列名
+    t_columns = list(df.columns)
+    # 获取时间列表
+    if index: # 如果时间列表是DataFrame的索引
+        df_time_list = df.index.to_list()
+    else: # 如果时间列表是DataFrame的列
+        df_time_list = df[column].to_list()
+    # 添加时间列
+    df["year"] = [i.year for i in df_time_list]
+    df["month"] = [i.month for i in df_time_list]
+    df["day"] = [i.day for i in df_time_list]
+    df["yday"] = [i.timetuple().tm_yday for i in df_time_list]
+    df["hour"] = [i.hour for i in df_time_list]
+    df["minute"] = [i.minute for i in df_time_list]
+    df["second"] = [i.second for i in df_time_list]
+    if times_first: # 判断时间列是否放在最前面
+        # 调整列顺序
+        df_columns_new = list(df.columns[len(t_columns):]) + list(t_columns)
+        df = df.loc[:, df_columns_new]
+    return df
+
+

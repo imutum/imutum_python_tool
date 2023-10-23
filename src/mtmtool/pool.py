@@ -63,8 +63,9 @@ class MapPool:
         self.max_workers = max_workers # 最大worker数量
         self.buffer = [] # 任务缓冲区
         self.pool_type = pool_type # 进程池类型
-        # 将函数序列化，以便在子进程中使用
-        self.function_dill = dill.dumps(func)
+        # 记录函数
+        self.function_dill = dill.dumps(func) # 将函数序列化，以便在子进程中使用，对于类实例来说可能会出现问题
+        self.function_real = func
         # 复制函数属性
         update_wrapper(self, func)
         self.__wrapped__ = self.function_dill
@@ -76,7 +77,7 @@ class MapPool:
             kwargs.pop("workers")        
         if workers is None:
             # 如果没有传入worker数量, 则像普通函数一样运行
-            func = dill.loads(self.function_dill)
+            func = dill.loads(self.function_dill) if self.function_real is None else self.function_real
             return func(*args, **kwargs)
         else:
             # 如果指定了worker数量, 则将任务放入缓冲区
@@ -110,11 +111,13 @@ class MapPool:
             # 如果有多个worker, 则运行缓冲区中的任务
             if pool_type is not None and pool_type.lower() == "process":
                 # 如果是进程池, 则需要将函数序列化，否则会报错
+                self.function_real = None
                 worker_wrapper = partial(self.worker_wrapper, func=None)
                 pool_executor = ProcessPoolExecutor
             else:
                 # 如果是线程池, 则不需要将函数序列化
-                worker_wrapper = partial(self.worker_wrapper, func=dill.loads(self.function_dill))
+                func = dill.loads(self.function_dill) if self.function_real is None else self.function_real
+                worker_wrapper = partial(self.worker_wrapper, func=func)
                 pool_executor = ThreadPoolExecutor
             # 使用线程池或进程池运行任务
             with pool_executor(max_workers=workers) as executor:

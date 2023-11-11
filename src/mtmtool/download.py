@@ -113,6 +113,7 @@ class SingleConnectionDownloaderThread(threading.Thread):
         # 线程控制条件
         self.wait_event = threading.Event()
         self.running = False
+        self.error = None
         self.exit = False
 
     def check_file_integrity(self, item, force=False):
@@ -229,8 +230,10 @@ class SingleConnectionDownloaderThread(threading.Thread):
                 else:
                     FileIntegrity.rm(file_path)
 
-            except requests.exceptions.HTTPError as e:
+            except requests.exceptions.RequestException as e:
                 logger.error(e)
+            except Exception as e:
+                self.error = e
             finally:
                 # 单次任务完成
                 response.close() if response else None
@@ -261,6 +264,9 @@ class SingleConnectionDownloaderThreadPool:
             thread.wait_event.clear()
             thread.start()
         while True:
+            for thread in self.downloader_pools:
+                if thread.error:
+                    raise thread.error
             if self.quene.empty():
                 if not any([thread.running for thread in self.downloader_pools]):
                     for thread in self.downloader_pools:

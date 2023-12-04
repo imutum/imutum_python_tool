@@ -22,6 +22,7 @@ def telegram(message: str, token: str, host="api.telegram.org", mono=False, **kw
     # 生成url
     url = f"https://{host}/bot{bot_id}/sendMessage"
     # 设置字体为等宽字体
+    text = message
     if mono and "parse_mode" not in kwargs:
         text = f"<pre>{message}</pre>"
         kwargs["parse_mode"] = "HTML"

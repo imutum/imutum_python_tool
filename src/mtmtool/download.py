@@ -321,8 +321,12 @@ def download_from_dataframe(pool:SingleConnectionDownloaderThreadPool, df, obj_d
             df_temp.drop(index=df_temp[df_temp["size"] < 0].index, inplace=True)
             df_temp.drop_duplicates(subset=["url"], keep="last", inplace=True)
             df_merge = df.merge(df_temp, on="url", how="left", suffixes=("", "_y"))
-            df["filename"] = df_merge["filename_y"].fillna(df_merge["filename"])
-            df["size"] = df_merge["size_y"].fillna(df_merge["size"])
+            # 当出现重复字段时, 使用新字段的值替换原始字段的值
+            if "filename_y" in df_merge.columns:
+                df["filename"] = df_merge["filename_y"].fillna(df_merge["filename"])
+            if "size_y" in df_merge.columns:
+                df["size"] = df_merge["size_y"].fillna(df_merge["size"])
+            # 删除全为nan值的列
             df.dropna(axis=1, how="all", inplace=True)
             df.to_csv(tmp_csv, index=False)
             FileIntegrity.rm(".downtmp") if os.path.exists(".downtmp") else None

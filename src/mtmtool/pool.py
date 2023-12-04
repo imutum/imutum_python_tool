@@ -19,6 +19,8 @@ map 与 starmap 函数的区别:
     starmap可展开两次, 可以向函数传入多个参数
 product 函数:
     输入多个可迭代参数, 返回所有笛卡尔积元组
+
+Note: 将在未来版本中删除并重构
 """
 
 
@@ -64,7 +66,7 @@ class MapPool:
         self.buffer = [] # 任务缓冲区
         self.pool_type = pool_type # 进程池类型
         # 记录函数
-        self.function_dill = dill.dumps(func) # 将函数序列化，以便在子进程中使用，对于类实例来说可能会出现问题
+        self.function_dill = dill.dumps(func, recurse=True, byref=True) # 将函数序列化，以便在子进程中使用，对于类实例只能调用类原方法与原属性，方法中不能调用类实例新属性
         self.function_real = func
         # 复制函数属性
         update_wrapper(self, func)

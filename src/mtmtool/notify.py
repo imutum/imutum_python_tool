@@ -32,9 +32,14 @@ def telegram(message: str, token: str, host="api.telegram.org", mono=False, **kw
         "text": text,
         **kwargs,
     }
-    return requests.get(url, data=data).json()
+    try:
+        response = requests.get(url, params=data)
+        return response.json()
+    except:
+        print(f"Telegram API response:\n {response.text}")
+        raise ValueError(f"Telegram API Error.")
 
 
 def pushplus(message, token, title="default", template="html", **kwargs):
-    url = f'http://www.pushplus.plus/send?token={token}&title={title}&content={message}&template={template}'
+    url = f"http://www.pushplus.plus/send?token={token}&title={title}&content={message}&template={template}"
     return requests.get(url=url).text

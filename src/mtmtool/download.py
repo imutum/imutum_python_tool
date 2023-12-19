@@ -20,18 +20,21 @@ logger_io = stream_logger("IO")
 
 def extract_filename_from_headers(headers):
     # 检查 Content-Disposition header 是否存在
-    if 'Content-Disposition' in headers:
+    if "Content-Disposition" in headers:
         # 从 Content-Disposition header 中提取文件名
-        content_disposition = headers['Content-Disposition']
-        _, params = content_disposition.split(';')
-        filename_param = next((param.strip() for param in params.split(';') if param.strip().startswith('filename=')), None)
+        content_disposition = headers["Content-Disposition"]
+        _, params = content_disposition.split(";")
+        filename_param = next(
+            (param.strip() for param in params.split(";") if param.strip().startswith("filename=")), None
+        )
 
         if filename_param:
-            _, filename = filename_param.split('=')
-            filename = unquote(filename.strip('\"'))
+            _, filename = filename_param.split("=")
+            filename = unquote(filename.strip('"'))
             return filename
     else:
         return ""
+
 
 class TrustHostnameSession(requests.Session):
     def __init__(self, **kwargs) -> None:
@@ -43,7 +46,7 @@ class TrustHostnameSession(requests.Session):
         if raw_flag and urlparse(new_url).hostname in self.trust_hostnames:
             return False
         return raw_flag
-    
+
 
 class FileIntegrity:
     @staticmethod
@@ -51,7 +54,7 @@ class FileIntegrity:
         if not os.path.isfile(path):
             return -1
         return os.path.getsize(path)
-    
+
     @staticmethod
     def md5(path):
         if not os.path.isfile(path):
@@ -74,11 +77,20 @@ class FileIntegrity:
 
 
 class SingleConnectionDownloaderThread(threading.Thread):
-    def __init__(self, queue:Queue, session=None, timeout=None, check_integrity=False, should_wait=False, only_file = True, **kwargs):
-        super().__init__(daemon=kwargs.get("daemon", None)) # 线程守护
+    def __init__(
+        self,
+        queue: Queue,
+        session=None,
+        timeout=None,
+        check_integrity=False,
+        should_wait=False,
+        only_file=True,
+        **kwargs,
+    ):
+        super().__init__(daemon=kwargs.get("daemon", None))  # 线程守护
 
         # 设置请求会话
-        self.session = session or TrustHostnameSession() # requests session
+        self.session = session or TrustHostnameSession()  # requests session
         if "cookies" in kwargs:
             self.session.cookies.update(kwargs["cookies"])
         if "headers" in kwargs:
@@ -91,8 +103,8 @@ class SingleConnectionDownloaderThread(threading.Thread):
             self.session.trust_hostnames = kwargs["trust_hostnames"]
 
         # 设置下载任务队列
-        self.quene = queue if queue else None # 下载任务队列
-        self.should_wait = should_wait # 是否等待下载任务, 每次下载任务完成后, 等待wait_event被唤醒
+        self.quene = queue if queue else None  # 下载任务队列
+        self.should_wait = should_wait  # 是否等待下载任务, 每次下载任务完成后, 等待wait_event被唤醒
         self.only_file = only_file
 
         assert isinstance(queue, Queue), "queue is not Queue class"
@@ -118,13 +130,13 @@ class SingleConnectionDownloaderThread(threading.Thread):
 
     def check_file_integrity(self, item, force=False):
         # 检查文件md5
-        if md5:=FileIntegrity.md5(item.get("path", "")) if item.get("md5", "") else None:
-            return md5 == (item.get("md5", "") )
+        if md5 := FileIntegrity.md5(item.get("path", "")) if item.get("md5", "") else None:
+            return md5 == (item.get("md5", ""))
         # 检查文件大小
-        if size:=FileIntegrity.size(item.get("path", "")) if item.get("size", -1) > 0 else None:
-            return size == (item.get("size", -1) )
+        if size := FileIntegrity.size(item.get("path", "")) if item.get("size", -1) > 0 else None:
+            return size == (item.get("size", -1))
         # 看看是否设置了不检查文件完整性, 如果设置中不检查文件完整性, 则默认为完整
-        if not item.get("check_integrity", False) and not force: # force参数用于强制检查文件完整性
+        if not item.get("check_integrity", False) and not force:  # force参数用于强制检查文件完整性
             return True
         return False
 
@@ -171,11 +183,11 @@ class SingleConnectionDownloaderThread(threading.Thread):
             try:
                 # 发送请求
                 response = self.session.request(
-                    method="HEAD", 
-                    url=item.get("url", "https://"), 
+                    method="HEAD",
+                    url=item.get("url", "https://"),
                     timeout=item.get("timeout", None),
                     stream=False,
-                    allow_redirects=True
+                    allow_redirects=True,
                 )
                 response.raise_for_status()
                 response.close()
@@ -189,37 +201,37 @@ class SingleConnectionDownloaderThread(threading.Thread):
                 # 获取文件路径
                 file_path, file_dir, file_name = self.get_file_path(item, headers)
                 item["path"] = file_path
-                
+
                 # 获取文件大小
                 response_content_length = int(headers.get("Content-Length", -1))
                 if item.get("size", -1) < 0 and response_content_length > 0:
                     item["size"] = response_content_length
-                
+
                 # 记录此次请求的信息
-                with open(".downtmp", 'a') as fp:
+                with open(".downtmp", "a") as fp:
                     text = item.get("url", "https://") + "," + file_name + "," + str(response_content_length) + "\n"
                     fp.write(text)
-                
+
                 # 下载前强制检查文件完整性, 如果文件不完整, 则删除文件重新下载, 如果文件完整, 则跳过下载
                 is_integrity_predownload = self.check_file_integrity(item, force=True)
                 if is_integrity_predownload:
                     self.print_success_info(item)
                     continue
-                
+
                 # 删除之前的文件
                 FileIntegrity.rm(file_path)
-                
+
                 # 分块下载文件
                 logger.info(f"Downloading File: {file_name}")
                 response = self.session.request(
-                    method=item.get("method", "GET"), 
-                    url=item.get("url", "https://"), 
+                    method=item.get("method", "GET"),
+                    url=item.get("url", "https://"),
                     timeout=item.get("timeout", None),
                     stream=True,
-                    allow_redirects=True
+                    allow_redirects=True,
                 )
                 response.raise_for_status()
-                with open(file_path, 'wb') as fd:
+                with open(file_path, "wb") as fd:
                     for chunk in response.iter_content(chunk_size=item.get("chunk_size", None)):
                         fd.write(chunk)
 
@@ -243,15 +255,18 @@ class SingleConnectionDownloaderThread(threading.Thread):
 
 class SingleConnectionDownloaderThreadPool:
     quene_default = Queue()
-    def __init__(self, max_threads = 1, **kwargs) -> None:
+
+    def __init__(self, max_threads=1, **kwargs) -> None:
         super().__init__()
         self.max_threads = max_threads
         self.quene = Queue()
-        kwargs.update({
-            "queue": self.quene,
-            "daemon": True,
-            "should_wait": True,
-        })
+        kwargs.update(
+            {
+                "queue": self.quene,
+                "daemon": True,
+                "should_wait": True,
+            }
+        )
         self.kwargs = kwargs
         pass
 
@@ -280,12 +295,21 @@ class SingleConnectionDownloaderThreadPool:
                         thread.wait_event.set()
                         break
                 time.sleep(QUENE_DEQUENE_DELAY)
-    
 
 
-def download_from_dataframe(pool:SingleConnectionDownloaderThreadPool, df, obj_dir:str=".", tmp_csv:str="tempfileinfos.csv", loop_times=10):
+def download_from_dataframe(
+    pool: SingleConnectionDownloaderThreadPool,
+    df,
+    obj_dir: str = None,
+    tmp_csv: str = "tempfileinfos.csv",
+    loop_times=10,
+):
     import pandas as pd
+
     flag_all_complete = False
+
+    if obj_dir is None:
+        obj_dir = "."
     for _ in range(loop_times):
         # 如果所有文件都下载完成, 则跳过
         if flag_all_complete:
@@ -297,20 +321,22 @@ def download_from_dataframe(pool:SingleConnectionDownloaderThreadPool, df, obj_d
         # 检查是否有文件名称字段, 如果没有, 则设置为空
         if "filename" not in df.columns:
             df["filename"] = ""
-        
+
         # 将未完成下载的文件加入下载队列
         for _, row in df.iterrows():
             _dict = {"filedir": obj_dir}
-            filepath = os.path.join(obj_dir, row.get("filename", ""))
-            if "filedir" in row and row["filedir"]:
+            if "filedir" in row and row["filedir"]:  # 如果有文件夹字段, 则使用文件夹字段
                 _dict["filedir"] = row["filedir"]
-            if "filename" in row and row["filename"] and os.path.isfile(filepath):
+            if "filename" in row and row["filename"]:  # 如果有文件名字段, 则使用文件名字段
+                _dict["filename"] = row["filename"]
+            filepath = os.path.join(_dict["filedir"], _dict["filename"])  # 拼接文件路径
+            if os.path.isfile(filepath):  # 如果文件已经存在并且完整, 则跳过
                 flag_file_size = "size" in row and row["size"] > 0 and FileIntegrity.size(filepath) == row["size"]
                 flag_file_md5 = "md5" in row and row["md5"] and FileIntegrity.md5(filepath) == row["md5"]
                 if flag_file_size or flag_file_md5:
                     continue
-            _dict.update(row.to_dict())
-            pool.put(**_dict)
+            _dict.update(row.to_dict())  # 将行数据转换为字典，更新到下载字典中
+            pool.put(**_dict)  # 将下载字典加入下载队列
 
         # 开始下载
         pool.start()

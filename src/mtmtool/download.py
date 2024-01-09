@@ -4,7 +4,6 @@ import threading
 import time
 from queue import Queue
 from urllib.parse import unquote, urlparse
-import copy
 
 import requests
 
@@ -13,6 +12,7 @@ from mtmtool.log import stream_logger
 
 QUENE_DEQUENE_DELAY = 0.1
 TRUST_HOSTNAMES_IN_REDIRECTING = ["urs.earthdata.nasa.gov"]
+GLOBAL_DOWNLOAD_LOCK = threading.Lock()
 
 logger = stream_logger("Down")
 logger_io = stream_logger("IO")
@@ -208,9 +208,11 @@ class SingleConnectionDownloaderThread(threading.Thread):
                     item["size"] = response_content_length
 
                 # 记录此次请求的信息
+                GLOBAL_DOWNLOAD_LOCK.acquire()  # 申请全局锁
                 with open(".downtmp", "a") as fp:
                     text = item.get("url", "https://") + "," + file_name + "," + str(response_content_length) + "\n"
                     fp.write(text)
+                GLOBAL_DOWNLOAD_LOCK.release()  # 释放全局锁
 
                 # 下载前强制检查文件完整性, 如果文件不完整, 则删除文件重新下载, 如果文件完整, 则跳过下载
                 is_integrity_predownload = self.check_file_integrity(item, force=True)
@@ -300,23 +302,31 @@ class SingleConnectionDownloaderThreadPool:
 def download_from_dataframe(
     pool: SingleConnectionDownloaderThreadPool,
     df,
-    obj_dir: str = None,
     tmp_csv: str = "tempfileinfos.csv",
-    loop_times=10,
+    loop: int = 10,
 ):
     import pandas as pd
 
-    flag_all_complete = False
+    # 检查输入参数
+    df = df.copy()
+    if df.empty:
+        logger.error("下载任务为空!")
+        return
+    if "url" not in df.columns:
+        logger.error("'url' column is not in the pandas.dataframe!")
+        return
+    if loop < 1:
+        logger.error("param 'loop' must be greater than 0!")
+        return
+    if "complete" not in df.columns:  # 如果没有下载完成标志位, 则添加下载完成标志位
+        df["complete"] = False
 
-    if obj_dir is None:
-        obj_dir = "."
-    for _ in range(loop_times):
-        # 如果所有文件都下载完成, 则跳过
-        if flag_all_complete:
-            continue
-
-        # 检查是否有URL字段需要下载
-        assert "url" in df.columns, "url column is not in the dataframe!"
+    # 变量初始化
+    flag_all_complete = False  # 是否所有文件都下载完成, 如果所有文件都下载完成, 则跳过下载, 否则继续下载
+    actual_total_count = 0  # 计数器, 用于记录下载次数
+    for _ in range(loop):
+        # 变量初始化
+        _count = 0  # 计数器, 用于记录迭代下载次数
 
         # 检查是否有文件名称字段, 如果没有, 则设置为空
         if "filename" not in df.columns:
@@ -324,27 +334,49 @@ def download_from_dataframe(
 
         # 将未完成下载的文件加入下载队列
         for _, row in df.iterrows():
-            _dict = {"filedir": obj_dir}
+            # 变量初始化
+            _dict = {}
+            filepath = None
+            is_complete = row["complete"]  # 获取下载完成标志位
+            # 获取下载的文件路径
             if "filedir" in row and row["filedir"]:  # 如果有文件夹字段, 则使用文件夹字段
                 _dict["filedir"] = row["filedir"]
             if "filename" in row and row["filename"]:  # 如果有文件名字段, 则使用文件名字段
                 _dict["filename"] = row["filename"]
-            filepath = os.path.join(_dict["filedir"], _dict["filename"])  # 拼接文件路径
-            if os.path.isfile(filepath):  # 如果文件已经存在并且完整, 则跳过
-                flag_file_size = "size" in row and row["size"] > 0 and FileIntegrity.size(filepath) == row["size"]
-                flag_file_md5 = "md5" in row and row["md5"] and FileIntegrity.md5(filepath) == row["md5"]
-                if flag_file_size or flag_file_md5:
-                    continue
-            _dict.update(row.to_dict())  # 将行数据转换为字典，更新到下载字典中
-            pool.put(**_dict)  # 将下载字典加入下载队列
+            if "filename" in _dict:  # 如果有文件夹和文件名字段, 则跳过
+                if "filedir" in _dict:
+                    filepath = os.path.join(_dict["filedir"], _dict["filename"])  # 拼接文件路径
+                else:
+                    filepath = _dict["filename"]
+            # 检查文件路径是否需要下载
+            if not is_complete:
+                if filepath is not None and os.path.isfile(filepath):  # 如果文件已经存在
+                    # 获取文件完整性信息
+                    flag_file_size = "size" in row and row["size"] > 0 and FileIntegrity.size(filepath) == row["size"]
+                    flag_file_md5 = "md5" in row and row["md5"] and FileIntegrity.md5(filepath) == row["md5"]
+                    if "md5" in row:
+                        if flag_file_md5:
+                            is_complete = True
+                    else:
+                        if flag_file_size:
+                            is_complete = True
+                # 如果文件没有完全下载, 则加入下载队列
+                if not is_complete:
+                    _dict.update(row.to_dict())  # 将行数据转换为字典, 更新到下载字典中
+                    pool.put(**_dict)  # 将下载字典加入下载队列
+                    actual_total_count += 1  # 计数器加1
+                    _count += 1  # 计数器加1
+            row["complete"] = is_complete  # 更新下载完成标志位
 
         # 开始下载
         pool.start()
 
         # 后处理
-        if os.path.exists(".downtmp"):
+        if os.path.exists(".downtmp") and tmp_csv is not None:
             df_temp = pd.read_csv(".downtmp", header=None, names=["url", "filename", "size"])
+            # 剔除文件大小小于0的文件, 按文件大小升序排序, 去除重复文件, 保留最后一个文件
             df_temp.drop(index=df_temp[df_temp["size"] < 0].index, inplace=True)
+            df_temp.sort_values(by=["size"], ascending=[True], inplace=True)
             df_temp.drop_duplicates(subset=["url"], keep="last", inplace=True)
             df_merge = df.merge(df_temp, on="url", how="left", suffixes=("", "_y"))
             # 当出现重复字段时, 使用新字段的值替换原始字段的值
@@ -354,10 +386,17 @@ def download_from_dataframe(
                 df["size"] = df_merge["size_y"].fillna(df_merge["size"])
             # 删除全为nan值的列
             df.dropna(axis=1, how="all", inplace=True)
+            # 保存文件
             df.to_csv(tmp_csv, index=False)
-            FileIntegrity.rm(".downtmp") if os.path.exists(".downtmp") else None
-        else:
+            # 删除临时文件
+            FileIntegrity.rm(".downtmp")
+
+        if _count == 0:  # 如果本次迭代没有下载任务, 则说明全部下载成功, 退出循环
             flag_all_complete = True
-    else:
-        logger.info("下载完成") if flag_all_complete else logger.info("下载未完成")
+            break
+
+    text = "下载完成" if flag_all_complete else "下载未完成"
+    logger.info(f"{text}, 本次共尝试下载{actual_total_count}次")
+
+    if tmp_csv is not None:
         logger.info(f"本次下载的文件完整信息请查看: {tmp_csv}")

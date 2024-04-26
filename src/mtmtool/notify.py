@@ -43,7 +43,7 @@ def telegram(message: str, token: str, host="api.telegram.org", mono=False, **kw
             print(f"Telegram API response ({text}): {e} ")
         else:
             print(f"Telegram API response ({text}): {e} -> {response.text}")
-        if kwargs.get("raise_error", True):
+        if kwargs.get("raise_error", False):
             raise ValueError(f"Telegram API Error. {e}")
 
 

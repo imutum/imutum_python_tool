@@ -32,12 +32,19 @@ def telegram(message: str, token: str, host="api.telegram.org", mono=False, **kw
         "text": text,
         **kwargs,
     }
+    # 发送请求
+    response = None
     try:
-        response = requests.get(url, params=data)
-        return response.json()
-    except:
-        print(f"Telegram API response:\n {response.text}")
-        raise ValueError(f"Telegram API Error.")
+        response = requests.get(url, params=data, timeout=1)
+        resp_json = response.json()
+        return resp_json
+    except Exception as e:
+        if response is None:
+            print(f"Telegram API response ({text}): {e} ")
+        else:
+            print(f"Telegram API response ({text}): {e} -> {response.text}")
+        if kwargs.get("raise_error", True):
+            raise ValueError(f"Telegram API Error. {e}")
 
 
 def pushplus(message, token, title="default", template="html", **kwargs):
